@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.motibuddy.app.ui.theme.MotiBuddyTheme
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,11 +49,26 @@ fun MotiBuddy(modifier: Modifier = Modifier) {
     var timeLeft by remember { mutableLongStateOf(25 * 60L) }
     var isTimerRunning by remember { mutableStateOf(false) }
 
+    LaunchedEffect(isTimerRunning) {
+        if (isTimerRunning) {
+            while (timeLeft > 0) {
+                delay(1000)
+                timeLeft -= 1
+            }
+            isTimerRunning = false
+            // Trigger notification
+
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (!isTimerRunning) {
+            Text(text = "Paused")
+        } else Text(text = "")
         Text(text = formatTime(timeLeft), fontSize = 96.sp)
         Spacer(Modifier.height(12.dp))
         Button(
@@ -59,6 +76,7 @@ fun MotiBuddy(modifier: Modifier = Modifier) {
                 if (isTimerRunning) {
                     // Pause the timer
                     isTimerRunning = false
+//                    timeLeft = 25 * 60L
                 } else {
                     // Start the timer
                     isTimerRunning = true
@@ -66,6 +84,17 @@ fun MotiBuddy(modifier: Modifier = Modifier) {
             }
         ) {
             Text(text = if (isTimerRunning) "Pause" else "Start")
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = {
+                // Reset the timer
+                timeLeft = 25 * 60L
+//                timeLeft = 5 // debug
+                isTimerRunning = false
+            }
+        ) {
+            Text(text = "Reset")
         }
     }
 }
