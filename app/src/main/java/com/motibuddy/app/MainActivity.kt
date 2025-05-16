@@ -9,12 +9,25 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Coffee
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Whatshot
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,7 +44,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()             // keep your window styling
         createNotificationChannel()     // set up Android O+ channel
         setContent {
-            MotiBuddyTheme {
+            MaterialTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MotiBuddy(modifier = Modifier.padding(innerPadding))
                 }
@@ -67,17 +80,19 @@ fun Context.showNotification(title: String, message: String) {
         .notify(1001, builder.build())
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MotiBuddy(modifier: Modifier = Modifier) {
-    // 2) Grab a Context for notifications
+    // Grab a Context for notifications
     val context = LocalContext.current
 
-    // 3) Timer state (25*60 = 1500 seconds)
-    var timeLeft by remember { mutableStateOf(25 * 60L) }
+    // Timer state (25*60 = 1500 seconds)
+    var timeLeft by remember { mutableIntStateOf(25 * 60) }
     var isResetable by remember { mutableStateOf(false) }
     var isTimerRunning by remember { mutableStateOf(false) }
+    var isTakingABreak by remember { mutableStateOf(false) }
 
-    // 4) Countdown coroutine + trigger notification
+    // Countdown coroutine + trigger notification
     LaunchedEffect(isTimerRunning) {
         if (isTimerRunning) {
             while (timeLeft > 0) {
@@ -90,42 +105,129 @@ fun MotiBuddy(modifier: Modifier = Modifier) {
         }
     }
 
-    // 5) UI layout
+    // UI layout
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (!isTimerRunning) {
-            if (isResetable) Text(text = "Paused")
-            else Text(text = "Ready")
-        } else Text(text = "")
+            if (isResetable) Text(if (timeLeft > 0) "Paused" else "Done")
+            else Text( text = if (!isTakingABreak) "Ready to work?" else "Ready to take a break?")
+        } else Text(text = if (!isTakingABreak) "Working" else "Taking a break")
         Text(text = formatTime(timeLeft), fontSize = 96.sp)
         Spacer(Modifier.height(12.dp))
-        if (timeLeft > 0) {
-            Button(onClick = {
-                isTimerRunning = !isTimerRunning
-                isResetable = true
-            }) {
-                Text(if (isTimerRunning) "Pause" else "Start")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (timeLeft > 0) {
+                Button(onClick = {
+                    isTimerRunning = !isTimerRunning
+                    isResetable = true
+                }) {
+                    if (!isResetable && !isTimerRunning) {
+                        Icon(
+                            imageVector = Icons.Outlined.PlayArrow,
+                            contentDescription = "Start the timer",
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                        Text("Start")
+                    } else {
+                        if (isTimerRunning) {
+                            Icon(
+                                imageVector = Icons.Outlined.Pause,
+                                contentDescription = "Pause the timer",
+                                modifier = Modifier.size(ButtonDefaults.IconSize),
+                            )
+                            Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                            Text(text = "Pause")
+                        }
+                        else {
+                            Icon(
+                                imageVector = Icons.Outlined.PlayArrow,
+                                contentDescription = "Resume the timer",
+                                modifier = Modifier.size(ButtonDefaults.IconSize),
+                            )
+                            Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                            Text(text = "Resume")
+                        }
+                    }
+                }
             }
-        }
-        Spacer(Modifier.height(12.dp))
-        if (isResetable) {
-            Button(onClick = {
-//            timeLeft = 25 * 60L
-                timeLeft = 5
-                isTimerRunning = false
-                isResetable = false
-            }) {
-                Text("Reset")
+            if (timeLeft == 0) {
+                if (!isTakingABreak) {
+                    Button(onClick = {
+                        isTimerRunning = false
+                        isResetable = false
+                        isTakingABreak = true
+                        timeLeft = resetTimer(isTakingABreak)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Coffee,
+                            contentDescription = "Take a break",
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                        Text("Take a break")
+                    }
+                } else {
+                    Button(onClick = {
+                        isTimerRunning = false
+                        isResetable = false
+                        isTakingABreak = false
+                        timeLeft = resetTimer(isTakingABreak)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Outlined.RestartAlt,
+                            contentDescription = "Reset or start a new session",
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                        Text("Get back to work")
+                    }
+                }
+            }
+            if (isResetable) {
+                if (isTakingABreak) {
+                    OutlinedButton(onClick = {
+                        isTimerRunning = false
+                        isResetable = false
+                        timeLeft = resetTimer(isTakingABreak)
+                    }) {
+                        Icon(
+                            imageVector = if (timeLeft > 0) Icons.Outlined.RestartAlt else Icons.Outlined.Coffee,
+                            contentDescription = "Another break",
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                        Text(if (timeLeft > 0) "Reset" else "Another break")
+                    }
+                } else {
+                    OutlinedButton(onClick = {
+                        isTimerRunning = false
+                        isResetable = false
+                        timeLeft = resetTimer(isTakingABreak)
+                    }) {
+                        Icon(
+                            imageVector = if (timeLeft > 0) Icons.Outlined.RestartAlt else Icons.Outlined.Whatshot,
+                            contentDescription = "Another break",
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                        Text(if (timeLeft > 0) "Reset" else "Grind another session")
+                    }
+                }
             }
         }
     }
 }
 
+fun resetTimer(isTakingABreak: Boolean): Int {
+    return if (isTakingABreak) 5 else 8 // DEBUG
+//    return if (isTakingABreak) 5 * 60 else 25 * 60
+}
+
 /** Helper to format seconds as MM:SS */
-fun formatTime(seconds: Long): String {
+fun formatTime(seconds: Int): String {
     val minutes = (seconds / 60) % 60
     val secs = seconds % 60
     return String.format("%02d:%02d", minutes, secs)
