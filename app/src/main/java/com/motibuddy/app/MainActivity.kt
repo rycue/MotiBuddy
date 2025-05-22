@@ -10,21 +10,32 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Coffee
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Whatshot
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,11 +64,66 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()             // keep your window styling
         createNotificationChannel()     // set up Android O+ channel
         setContent {
-            MaterialTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MotiBuddy(modifier = Modifier.padding(innerPadding))
-                    NavigationBar {
-
+            MotiBuddyTheme {
+                val items = listOf(
+                    BottomNavigationItem(
+                        title = "Home",
+                        selectedIcon = Icons.Filled.Home,
+                        unselectedIcon = Icons.Outlined.Home,
+                        hasNews = false,
+                        badgeCount = 45
+                    ),
+                    BottomNavigationItem(
+                        title = "Pomodoro",
+                        selectedIcon = Icons.Filled.Timer,
+                        unselectedIcon = Icons.Outlined.Timer,
+                        hasNews = false
+                    ),
+                    BottomNavigationItem(
+                        title = "Settings",
+                        selectedIcon = Icons.Filled.Settings,
+                        unselectedIcon = Icons.Outlined.Settings,
+                        hasNews = true
+                    )
+                )
+                var selectedItemIndex by rememberSaveable { mutableIntStateOf(0) }
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        NavigationBar {
+                            items.forEachIndexed { index, item ->
+                                NavigationBarItem(
+                                    selected = selectedItemIndex == index,
+                                    onClick = {
+                                        selectedItemIndex = index
+//                                    navController.navigate(item.title)
+                                    },
+                                    label = { Text(item.title) },
+                                    icon = {
+                                        BadgedBox(
+                                            badge = {
+                                                if (item.badgeCount != null) {
+                                                    Badge {
+                                                        Text(item.badgeCount.toString())
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = if (index == selectedItemIndex) {
+                                                    item.selectedIcon
+                                                } else item.unselectedIcon,
+                                                contentDescription = item.title
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                ) { innerPadding ->
+                    Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                        MotiBuddy()
                     }
                 }
             }
@@ -211,7 +277,7 @@ fun MotiBuddy(modifier: Modifier = Modifier) {
                             modifier = Modifier.size(ButtonDefaults.IconSize),
                         )
                         Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
-                        Text(if (timeLeft > 0) "Reset" else "Another break")
+                        Text(if (timeLeft > 0) "Reset" else "Extend")
                     }
                 } else {
                     OutlinedButton(onClick = {
@@ -225,7 +291,7 @@ fun MotiBuddy(modifier: Modifier = Modifier) {
                             modifier = Modifier.size(ButtonDefaults.IconSize),
                         )
                         Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
-                        Text(if (timeLeft > 0) "Reset" else "Grind another session")
+                        Text(if (timeLeft > 0) "Reset" else "Keep going")
                     }
                 }
             }
