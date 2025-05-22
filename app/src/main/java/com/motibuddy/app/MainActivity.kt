@@ -10,16 +10,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.Coffee
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Whatshot
 import androidx.compose.material3.Badge
@@ -71,7 +75,7 @@ class MainActivity : ComponentActivity() {
                         selectedIcon = Icons.Filled.Home,
                         unselectedIcon = Icons.Outlined.Home,
                         hasNews = false,
-                        badgeCount = 45
+                        badgeCount = 45,
                     ),
                     BottomNavigationItem(
                         title = "Pomodoro",
@@ -80,9 +84,9 @@ class MainActivity : ComponentActivity() {
                         hasNews = false
                     ),
                     BottomNavigationItem(
-                        title = "Settings",
-                        selectedIcon = Icons.Filled.Settings,
-                        unselectedIcon = Icons.Outlined.Settings,
+                        title = "Bot",
+                        selectedIcon = Icons.Filled.SmartToy,
+                        unselectedIcon = Icons.Outlined.SmartToy,
                         hasNews = true
                     )
                 )
@@ -106,7 +110,7 @@ class MainActivity : ComponentActivity() {
                                                     Badge {
                                                         Text(item.badgeCount.toString())
                                                     }
-                                                }
+                                                } else if (item.hasNews) Badge()
                                             }
                                         ) {
                                             Icon(
