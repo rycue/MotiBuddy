@@ -20,6 +20,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,6 +37,14 @@ import androidx.core.app.NotificationManagerCompat
 import com.motibuddy.app.ui.theme.MotiBuddyTheme
 import kotlinx.coroutines.delay
 
+data class BottomNavigationItem(
+    val title: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+    val hasNews: Boolean,
+    val badgeCount: Int? = null
+)
+
 private const val CHANNEL_ID = "motibuddy_channel"
 
 class MainActivity : ComponentActivity() {
@@ -47,6 +56,9 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MotiBuddy(modifier = Modifier.padding(innerPadding))
+                    NavigationBar {
+
+                    }
                 }
             }
         }
