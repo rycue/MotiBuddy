@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
@@ -31,18 +33,26 @@ import com.motibuddy.app.ui.theme.MotiBuddyTheme
 private const val CHANNEL_ID = "motibuddy_channel"
 
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         createNotificationChannel()
         setContent {
             MotiBuddyTheme {
+                // BEFORE Scaffold, get both VMs:
+                val taskViewModel: TaskViewModel = viewModel()
+                val pomodoroViewModel: PomodoroViewModel = viewModel()
+
+                // BottomNav state…
+                var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
+
                 val items = listOf(
-                    BottomNavigationItem("Home", Icons.Filled.Home, Icons.Outlined.Home, false, 45),
+                    BottomNavigationItem("Tasks", Icons.Filled.TaskAlt, Icons.Outlined.TaskAlt, false, 45),
                     BottomNavigationItem("Pomodoro", Icons.Filled.Timer, Icons.Outlined.Timer, false),
                     BottomNavigationItem("Bot", Icons.Filled.SmartToy, Icons.Outlined.SmartToy, true)
                 )
-                var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
+
                 Scaffold(
                     bottomBar = {
                         NavigationBar {
@@ -55,7 +65,7 @@ class MainActivity : ComponentActivity() {
                                             badge = {
                                                 when {
                                                     item.badgeCount != null -> Badge { Text(item.badgeCount.toString()) }
-                                                    item.hasNews      -> Badge()
+                                                    item.hasNews            -> Badge()
                                                 }
                                             }
                                         ) {
@@ -71,30 +81,27 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     floatingActionButton = {
-                        when (selectedIndex) {
-                            0 -> {
-                                LargeFloatingActionButton(onClick = {
-                                    selectedIndex = 1
-                                }) {
-                                    Icon(
-                                        Icons.Filled.Timer,
-                                        contentDescription = "Go to Pomodoro Screen"
-                                    )
-                                }
+                        if (selectedIndex == 0) {
+                            // now taskViewModel exists!
+                            FloatingActionButton(onClick = {
+                                taskViewModel.addTask("New Task", "Temporary")
+                            }) {
+                                Icon(Icons.Filled.Add, contentDescription = "Add task")
                             }
                         }
                     }
                 ) { inner ->
                     Box(Modifier.padding(inner)) {
                         when (selectedIndex) {
-                            0 -> HomeScreen()
-                            1 -> PomodoroScreen()
+                            0 -> TaskScreen()        // TaskScreen will use the same taskViewModel
+                            1 -> PomodoroScreen()    // PomodoroScreen will use pomodoroViewModel + taskViewModel
                             2 -> BotScreen()
                         }
                     }
                 }
             }
         }
+
     }
 
     private fun createNotificationChannel() {
@@ -131,9 +138,11 @@ fun Context.showNotification(title: String, message: String) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
+@Preview(showBackground = true)
 fun PomodoroScreen(
     viewModel: PomodoroViewModel = viewModel(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    taskViewModel: PomodoroViewModel = viewModel
 ) {
     val context = LocalContext.current
     val timeLeft by viewModel.timeLeft.collectAsState()
@@ -154,6 +163,29 @@ fun PomodoroScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16f.dp),
+            shape = MaterialTheme.shapes.small
+        ) {
+            Column(
+                modifier = Modifier.padding(16f.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Task Name",
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Task Description",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
         // Segmented buttons
         SingleChoiceSegmentedButtonRow {
             SegmentedButton(
@@ -230,8 +262,48 @@ fun PomodoroScreen(
     }
 }
 
+data class Task(
+    val id: Int,
+    val title: String,
+    val description: String = "",
+    val isDone: Boolean = false
+)
+@Composable
+fun TaskScreen(taskViewModel: TaskViewModel = viewModel()) {
+    val taskList by taskViewModel.taskList.collectAsState()
+    val context = LocalContext.current
 
-// rest of your screens unchanged...
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("Tasks", style = MaterialTheme.typography.headlineMedium)
+
+        // Show list of tasks
+        taskList.forEach { task ->
+            Card(
+                onClick = { taskViewModel.setCurrentTask(task.id) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(task.title, style = MaterialTheme.typography.titleLarge)
+                    if (task.description.isNotBlank())
+                        Text(task.description)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Add new task button (temporary stub)
+        Button(onClick = {
+            taskViewModel.addTask("New Task", "Description goes here")
+        }) {
+            Text("Add Task")
+        }
+    }
+}
+
+
 @Composable fun HomeScreen() {
     Text("Home")
 }
