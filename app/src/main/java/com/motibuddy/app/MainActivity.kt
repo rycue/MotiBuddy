@@ -11,6 +11,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -271,34 +274,42 @@ data class Task(
 @Composable
 fun TaskScreen(taskViewModel: TaskViewModel = viewModel()) {
     val taskList by taskViewModel.taskList.collectAsState()
-    val context = LocalContext.current
+    val listState = rememberLazyListState()
 
-    Column(modifier = Modifier.padding(16.dp)) {
+    // Automatically scroll to top when a new task is added
+    LaunchedEffect(taskList.size) {
+        if (taskList.isNotEmpty()) {
+            listState.animateScrollToItem(0)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         Text("Tasks", style = MaterialTheme.typography.headlineMedium)
 
-        // Show list of tasks
-        taskList.forEach { task ->
-            Card(
-                onClick = { taskViewModel.setCurrentTask(task.id) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(task.title, style = MaterialTheme.typography.titleLarge)
-                    if (task.description.isNotBlank())
-                        Text(task.description)
+        Spacer(Modifier.height(8.dp))
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Show newest task first
+            items(taskList.reversed()) { task ->
+                Card(
+                    onClick = { taskViewModel.setCurrentTask(task.id) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(task.title, style = MaterialTheme.typography.titleLarge)
+                        if (task.description.isNotBlank())
+                            Text(task.description)
+                    }
                 }
             }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // Add new task button (temporary stub)
-        Button(onClick = {
-            taskViewModel.addTask("New Task", "Description goes here")
-        }) {
-            Text("Add Task")
         }
     }
 }
