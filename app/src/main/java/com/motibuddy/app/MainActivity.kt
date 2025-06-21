@@ -1,6 +1,36 @@
 // MainActivity.kt
 package com.motibuddy.app
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import android.content.Intent
+
+import androidx.compose.runtime.*
+import androidx.compose.material3.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import com.motibuddy.app.ui.theme.AppTypography
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.motibuddy.app.ui.theme.ThemeColorManager
+import android.widget.Toast
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.runtime.collectAsState
+
+
+
+
+
+
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -33,6 +63,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.motibuddy.app.ui.theme.MotiBuddyTheme
 
+
 private const val CHANNEL_ID = "motibuddy_channel"
 
 class MainActivity : ComponentActivity() {
@@ -53,7 +84,9 @@ class MainActivity : ComponentActivity() {
                 val items = listOf(
                     BottomNavigationItem("Tasks", Icons.Filled.TaskAlt, Icons.Outlined.TaskAlt, false, 45),
                     BottomNavigationItem("Pomodoro", Icons.Filled.Timer, Icons.Outlined.Timer, false),
-                    BottomNavigationItem("Bot", Icons.Filled.SmartToy, Icons.Outlined.SmartToy, true)
+                    BottomNavigationItem("Bot", Icons.Filled.SmartToy, Icons.Outlined.SmartToy, true),
+                    BottomNavigationItem("Themes", Icons.Filled.ColorLens, Icons.Outlined.ColorLens, false)
+
                 )
 
                 Scaffold(
@@ -96,9 +129,10 @@ class MainActivity : ComponentActivity() {
                 ) { inner ->
                     Box(Modifier.padding(inner)) {
                         when (selectedIndex) {
-                            0 -> TaskScreen()        // TaskScreen will use the same taskViewModel
-                            1 -> PomodoroScreen()    // PomodoroScreen will use pomodoroViewModel + taskViewModel
+                            0 -> TaskScreen()
+                            1 -> PomodoroScreen()
                             2 -> BotScreen()
+                            3 -> ThemeSettingsScreen { recreate() } // This will trigger activity recreation for new theme
                         }
                     }
                 }
@@ -318,9 +352,147 @@ fun TaskScreen(taskViewModel: TaskViewModel = viewModel()) {
 @Composable fun HomeScreen() {
     Text("Home")
 }
-@Composable fun BotScreen()  {
-    Text("Bot")
+@Composable
+fun BotScreen() {
+    val context = LocalContext.current
+    val prefs = remember { BotPrefs(context) }
+    val contentResolver = context.contentResolver
+
+    var username by remember { mutableStateOf(prefs.username) }
+    var message by remember { mutableStateOf(prefs.message) }
+    var imageUri by remember { mutableStateOf<Uri?>(prefs.imageUri?.let { Uri.parse(it) }) }
+    var colorHex by remember { mutableStateOf(prefs.themeColor) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            imageUri = it
+            prefs.imageUri = it.toString()
+        }
+    }
+
+    LaunchedEffect(username, message) {
+        prefs.username = username
+        prefs.message = message
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Customize Your Bot", style = MaterialTheme.typography.headlineMedium)
+
+        Spacer(Modifier.height(16.dp))
+
+        Box(contentAlignment = Alignment.BottomEnd) {
+            val imageModifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+
+            if (imageUri != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(imageUri)
+                        .size(100) // resize to 100x100
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Bot Profile",
+                    contentScale = ContentScale.Crop,
+                    modifier = imageModifier
+                )
+            } else {
+                Icon(
+                    Icons.Default.SmartToy,
+                    contentDescription = null,
+                    modifier = imageModifier,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            IconButton(onClick = { launcher.launch("image/*") }) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit Image")
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Bot Name") },
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = message,
+            onValueChange = { message = it },
+            label = { Text("Motivational Message") },
+            leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) }
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = colorHex,
+            onValueChange = {
+                colorHex = it
+                prefs.themeColor = it
+            },
+            label = { Text("Primary Color Hex") },
+            leadingIcon = { Icon(Icons.Default.ColorLens, contentDescription = null) },
+            placeholder = { Text("#6750A4") }
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        val scope = rememberCoroutineScope()
+
+        Button(onClick = {
+            try {
+                val parsedColor = Color(android.graphics.Color.parseColor(colorHex))
+                prefs.themeColor = colorHex // Optional if you still want to persist
+                ThemeColorManager.setCustomPrimary(context, parsedColor) // 🔁 This triggers immediate update
+            } catch (e: Exception) {
+                Toast.makeText(context, "Invalid hex code", Toast.LENGTH_SHORT).show()
+            }
+        }) {
+            Text("Apply Color")
+        }
+    }
 }
+
+
+@Composable
+fun CustomTheme(content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    var primaryColor by remember { mutableStateOf(Color(0xFF6750A4)) }
+
+    LaunchedEffect(Unit) {
+        primaryColor = ThemeColorManager.getPrimaryColor(context)
+    }
+
+    val colorScheme = lightColorScheme(
+        primary = primaryColor,
+        secondary = Color(0xFF625B71)
+    )
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = AppTypography,
+        content = content
+    )
+}
+
+
 
 // Helpers
 fun formatTime(ms: Long): String {
