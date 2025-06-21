@@ -1,4 +1,3 @@
-// MainActivity.kt
 package com.motibuddy.app
 
 import android.net.Uri
@@ -14,14 +13,12 @@ import androidx.compose.material3.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.motibuddy.app.ui.theme.AppTypography
-
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.motibuddy.app.ui.theme.ThemeColorManager
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.collectAsState
-
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -61,7 +58,6 @@ import com.motibuddy.app.ui.theme.MotiBuddyTheme
 import androidx.compose.material3.ListItem
 import coil.compose.AsyncImage
 
-
 private const val CHANNEL_ID = "motibuddy_channel"
 
 class MainActivity : ComponentActivity() {
@@ -78,7 +74,7 @@ class MainActivity : ComponentActivity() {
                 var editingTaskId by rememberSaveable { mutableStateOf<Int?>(null) }
                 var isCreatingNewTask by rememberSaveable { mutableStateOf(false) }
                 val ctx = LocalContext.current
-              
+
                 Scaffold(
                     bottomBar = {
                         NavigationBar {
@@ -101,6 +97,12 @@ class MainActivity : ComponentActivity() {
                                     Icons.Filled.SmartToy,
                                     Icons.Outlined.SmartToy,
                                     true
+                                ),
+                                BottomNavigationItem(
+                                    "Themes",
+                                    Icons.Filled.Palette,
+                                    Icons.Outlined.Palette,
+                                    false
                                 )
                             )
 
@@ -189,6 +191,7 @@ class MainActivity : ComponentActivity() {
                                 pomodoroViewModel = pomoVM,
                                 taskViewModel = taskVM
                             )
+
                             2 -> BotScreen()
                             3 -> ThemeSettingsScreen { recreate() } // This will trigger activity recreation for new theme
                         }
@@ -505,7 +508,6 @@ data class Task(
 )
 
 
-
 @OptIn(
     ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
     ExperimentalMaterial3ExpressiveApi::class
@@ -662,9 +664,11 @@ fun TaskScreen(
 }
 
 
-@Composable fun HomeScreen() {
+@Composable
+fun HomeScreen() {
     Text("Home")
 }
+
 @Composable
 fun BotScreen() {
     val context = LocalContext.current
@@ -710,11 +714,16 @@ fun BotScreen() {
                 .clip(CircleShape)
 
             if (imageUri != null) {
-                AsyncImage(model = ImageRequest.Builder(LocalContext.current)
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUri)
                         .size(100) // resize to 100x100
                         .crossfade(true)
-                        .build(), contentDescription = "Bot Profile", contentScale = ContentScale.Crop, modifier = imageModifier)
+                        .build(),
+                    contentDescription = "Bot Profile",
+                    contentScale = ContentScale.Crop,
+                    modifier = imageModifier
+                )
             } else {
                 Icon(
                     Icons.Default.SmartToy,
@@ -768,7 +777,10 @@ fun BotScreen() {
             try {
                 val parsedColor = Color(android.graphics.Color.parseColor(colorHex))
                 prefs.themeColor = colorHex // Optional if you still want to persist
-                ThemeColorManager.setCustomPrimary(context, parsedColor) // 🔁 This triggers immediate update
+                ThemeColorManager.setCustomPrimary(
+                    context,
+                    parsedColor
+                ) // 🔁 This triggers immediate update
             } catch (e: Exception) {
                 Toast.makeText(context, "Invalid hex code", Toast.LENGTH_SHORT).show()
             }
@@ -799,9 +811,6 @@ fun CustomTheme(content: @Composable () -> Unit) {
         content = content
     )
 }
-
-
-
 
 // Helpers
 fun formatTime(ms: Long): String {
