@@ -225,10 +225,12 @@ fun PomodoroScreen(
 //    var segmentButtonSelectedIndex by remember { mutableIntStateOf(pomodoroViewModel.segmentButtonSelectedIndex.value) }
     val progress =
         if (pomodoroViewModel.segmentButtonSelectedIndex.value == 0) timeLeft.toFloat() / pomodoroViewModel.timeWork else timeLeft.toFloat() / pomodoroViewModel.timeBreak
+    val totalDuration by pomodoroViewModel.currentTotalDuration.collectAsState()
     val animatedProgress by animateFloatAsState(
-        targetValue = progress,
+        targetValue = timeLeft.toFloat() / totalDuration.toFloat(),
         animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec
     )
+
     val currentTask by taskViewModel.currentTask.collectAsState()
 
     LaunchedEffect(isRunning) {
@@ -291,7 +293,7 @@ fun PomodoroScreen(
                 shape = SegmentedButtonDefaults.itemShape(0, 2),
                 onClick = {
                     pomodoroViewModel.setSegmentButtonSelectedIndex(0)
-                    pomodoroViewModel.resetTimer(true)
+                    pomodoroViewModel.resetTimer()
                 },
                 selected = pomodoroViewModel.segmentButtonSelectedIndex.value == 0,
                 icon = { Icon(Icons.Filled.HourglassBottom, contentDescription = "Work") },
@@ -301,7 +303,7 @@ fun PomodoroScreen(
                 shape = SegmentedButtonDefaults.itemShape(1, 2),
                 onClick = {
                     pomodoroViewModel.setSegmentButtonSelectedIndex(1)
-                    pomodoroViewModel.resetTimer(false)
+//                    pomodoroViewModel.resetTimer(false)
                 },
                 selected = pomodoroViewModel.segmentButtonSelectedIndex.value == 1,
                 icon = { Icon(Icons.Filled.Coffee, contentDescription = "Break") },
@@ -349,7 +351,7 @@ fun PomodoroScreen(
             val justReset by pomodoroViewModel.timerJustReset.collectAsState()
             OutlinedButton(
                 onClick = {
-                    pomodoroViewModel.resetTimer(pomodoroViewModel.segmentButtonSelectedIndex.value == 0)
+                    pomodoroViewModel.resetTimer()
                 },
                 enabled = !justReset
             ) {
@@ -358,6 +360,83 @@ fun PomodoroScreen(
                 Text("Reset")
             }
         }
+
+        Spacer(Modifier.width(8.dp))
+
+        Spacer(Modifier.height(16.dp))
+
+// Preset timer buttons
+        val openCustomDialog = remember { mutableStateOf(false) }
+        if (openCustomDialog.value) {
+            var minutes by remember { mutableStateOf("") }
+            var seconds by remember { mutableStateOf("") }
+
+            AlertDialog(
+                onDismissRequest = { openCustomDialog.value = false },
+                title = { Text("Custom Timer") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = minutes,
+                            onValueChange = { minutes = it.filter { c -> c.isDigit() } },
+                            label = { Text("Minutes") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = seconds,
+                            onValueChange = { seconds = it.filter { c -> c.isDigit() } },
+                            label = { Text("Seconds") },
+                            singleLine = true
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val min = minutes.toLongOrNull() ?: 0L
+                        val sec = seconds.toLongOrNull() ?: 0L
+                        val totalMs = (min * 60 + sec) * 1000
+                        pomodoroViewModel.setCustomTime(totalMs)
+                        openCustomDialog.value = false
+                    }) {
+                        Text("Set")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { openCustomDialog.value = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val isWorkMode = pomodoroViewModel.segmentButtonSelectedIndex.value == 0
+
+            val presets = if (isWorkMode)
+                listOf(25 * 60 * 1000L to "25 min", 10 * 60 * 1000L to "10 min")
+            else
+                listOf(5 * 60 * 1000L to "5 min", 3 * 60 * 1000L to "3 min")
+
+            presets.forEach { (duration, label) ->
+                OutlinedButton(
+                    onClick = { pomodoroViewModel.setCustomTime(duration) },
+                    enabled = !isRunning
+                ) {
+                    Text(label)
+                }
+            }
+
+            OutlinedButton(
+                onClick = { openCustomDialog.value = true },
+                enabled = !isRunning
+            ) {
+                Text("Custom")
+            }
+        }
+
 
         // Confirmation dialog
         if (showConfirmDone && current != null) {

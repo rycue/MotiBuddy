@@ -19,6 +19,14 @@ class PomodoroViewModel : ViewModel() {
 
     val timeWork = 25 * 1000L
     val timeBreak = 10 * 1000L
+    private var focusModeDuration = timeWork
+    private var breakModeDuration = timeBreak
+
+
+    private var currentModeInitialDuration = timeWork // default fallback
+    private val _currentTotalDuration = MutableStateFlow(timeWork)
+    val currentTotalDuration = _currentTotalDuration.asStateFlow()
+
 
     private val _timerJustReset = MutableStateFlow(true)
     val timerJustReset = _timerJustReset.asStateFlow()
@@ -53,20 +61,48 @@ class PomodoroViewModel : ViewModel() {
         timerJob?.cancel()
     }
 
-    fun resetTimer(workMode: Boolean) {
+    fun setCustomTime(durationMs: Long) {
         stopTimer()
-        _isRunning.value = false
-        if (workMode) {
-            _timeLeft.value = timeWork
-        } else _timeLeft.value = timeBreak
+        if (_segmentButtonSelectedIndex.value == 0) {
+            focusModeDuration = durationMs
+        } else {
+            breakModeDuration = durationMs
+        }
+        currentModeInitialDuration = durationMs
+        _currentTotalDuration.value = durationMs
+        _timeLeft.value = durationMs
         _timerJustReset.value = true
     }
+
+
+
+    fun resetTimer() {
+        stopTimer()
+        _isRunning.value = false
+        _timeLeft.value = currentModeInitialDuration
+        _currentTotalDuration.value = currentModeInitialDuration
+        _timerJustReset.value = true
+    }
+
+
 
     fun startTickLoop() {
         runTimer(onFinish = {}) // no-op if already finished
     }
 
     fun setSegmentButtonSelectedIndex(index: Int) {
+        stopTimer() // ✅ force-stop any running timer when changing mode
+
         _segmentButtonSelectedIndex.value = index
+
+        val isFocus = index == 0
+        currentModeInitialDuration = if (isFocus) focusModeDuration else breakModeDuration
+        _currentTotalDuration.value = currentModeInitialDuration
+        _timeLeft.value = currentModeInitialDuration
+        _timerJustReset.value = true
     }
+
+
+
+
 }
