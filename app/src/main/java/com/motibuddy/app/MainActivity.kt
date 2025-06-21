@@ -97,6 +97,12 @@ class MainActivity : ComponentActivity() {
                                     Icons.Filled.SmartToy,
                                     Icons.Outlined.SmartToy,
                                     true
+                                ),
+                                BottomNavigationItem(
+                                    "Themes",
+                                    Icons.Filled.Palette,
+                                    Icons.Outlined.Palette,
+                                    false
                                 )
                             )
 
