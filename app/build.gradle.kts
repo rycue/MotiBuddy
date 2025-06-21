@@ -43,6 +43,7 @@ dependencies {
     val lifecycle_version = "2.9.0"
     val arch_version = "2.2.0"
 
+    implementation("androidx.compose.foundation:foundation:1.5.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycle_version")
     implementation("androidx.compose.material3:material3:1.4.0-alpha10")
     implementation("androidx.compose.material:material-icons-extended:1.6.7")
