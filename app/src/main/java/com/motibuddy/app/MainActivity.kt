@@ -7,10 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.layout.ContentScale
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import android.content.Intent
-
+import coil.request.ImageRequest
 import androidx.compose.runtime.*
 import androidx.compose.material3.*
 import androidx.compose.ui.graphics.Color
@@ -21,15 +19,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.motibuddy.app.ui.theme.ThemeColorManager
-import android.widget.Toast
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.collectAsState
-
-
-
-
-
-
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -68,6 +59,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.motibuddy.app.ui.theme.MotiBuddyTheme
 import androidx.compose.material3.ListItem
+import coil.compose.AsyncImage
 
 
 private const val CHANNEL_ID = "motibuddy_channel"
@@ -513,16 +505,6 @@ data class Task(
 )
 
 
-@Composable
-fun HomeScreen() {
-    Text("Home")
-}
-
-@Composable
-fun BotScreen() {
-    Text("Bot")
-}
-
 
 @OptIn(
     ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
@@ -728,16 +710,11 @@ fun BotScreen() {
                 .clip(CircleShape)
 
             if (imageUri != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
+                AsyncImage(model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUri)
                         .size(100) // resize to 100x100
                         .crossfade(true)
-                        .build(),
-                    contentDescription = "Bot Profile",
-                    contentScale = ContentScale.Crop,
-                    modifier = imageModifier
-                )
+                        .build(), contentDescription = "Bot Profile", contentScale = ContentScale.Crop, modifier = imageModifier)
             } else {
                 Icon(
                     Icons.Default.SmartToy,
