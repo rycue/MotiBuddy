@@ -25,7 +25,6 @@ fun ThemeSettingsScreen(onColorChanged: () -> Unit = {}) {
             text = "Coming Soon!",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.Black // ✅ Always black regardless of theme
         )
     }
 }

@@ -29,14 +29,20 @@ import android.widget.Toast.LENGTH_SHORT
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -56,9 +62,34 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.motibuddy.app.ui.theme.MotiBuddyTheme
 import androidx.compose.material3.ListItem
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import coil.ImageLoader
+import coil.decode.GifDecoder
+import kotlinx.coroutines.delay
 
 private const val CHANNEL_ID = "motibuddy_channel"
+
+data class MotivationEntry(
+    val imageResId: Int,
+    val message: String
+)
+
+val motivationList = listOf(
+    MotivationEntry(R.raw.motivation_1, "You're unstoppable!"),
+    MotivationEntry(R.raw.motivation_2, "Keep up the great work!"),
+    MotivationEntry(R.drawable.motivation_3, "Keep going!"),
+    MotivationEntry(R.drawable.motivation_4, "You're doing great!"),
+)
+
+fun getRandomMotivation(): MotivationEntry {
+    return motivationList.random()
+}
+
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -74,38 +105,43 @@ class MainActivity : ComponentActivity() {
                 var editingTaskId by rememberSaveable { mutableStateOf<Int?>(null) }
                 var isCreatingNewTask by rememberSaveable { mutableStateOf(false) }
                 val ctx = LocalContext.current
+                val tasks by taskVM.taskList.collectAsState()
+                val activeTasksCount = tasks.count { !it.isDone }
 
                 Scaffold(
                     bottomBar = {
-                        NavigationBar {
-                            val items = listOf(
-                                BottomNavigationItem(
-                                    "Tasks",
-                                    Icons.Filled.TaskAlt,
-                                    Icons.Outlined.TaskAlt,
-                                    false,
-                                    45
-                                ),
-                                BottomNavigationItem(
-                                    "Pomodoro",
-                                    Icons.Filled.Timer,
-                                    Icons.Outlined.Timer,
-                                    false
-                                ),
-                                BottomNavigationItem(
-                                    "Bot",
-                                    Icons.Filled.SmartToy,
-                                    Icons.Outlined.SmartToy,
-                                    true
-                                ),
-                                BottomNavigationItem(
-                                    "Themes",
-                                    Icons.Filled.Palette,
-                                    Icons.Outlined.Palette,
-                                    false
-                                )
-                            )
+                        val taskCount by taskVM.taskList.collectAsState()
+                        val isRunning by pomoVM.isRunning.collectAsState()
 
+                        val items = listOf(
+                            BottomNavigationItem(
+                                title = "Tasks",
+                                selectedIcon = Icons.Filled.TaskAlt,
+                                unselectedIcon = Icons.Outlined.TaskAlt,
+                                hasNews = false,
+                                badgeCount = if (activeTasksCount > 0) activeTasksCount else null
+                            ),
+                            BottomNavigationItem(
+                                title = "Pomodoro",
+                                selectedIcon = Icons.Filled.Timer,
+                                unselectedIcon = Icons.Outlined.Timer,
+                                hasNews = isRunning
+                            ),
+                            BottomNavigationItem(
+                                title = "Bot",
+                                selectedIcon = Icons.Filled.SmartToy,
+                                unselectedIcon = Icons.Outlined.SmartToy,
+                                hasNews = false
+                            ),
+                            BottomNavigationItem(
+                                title = "Themes",
+                                selectedIcon = Icons.Filled.Palette,
+                                unselectedIcon = Icons.Outlined.Palette,
+                                hasNews = false
+                            )
+                        )
+
+                        NavigationBar {
                             items.forEachIndexed { i, item ->
                                 NavigationBarItem(
                                     selected = selectedIndex == i,
@@ -115,7 +151,7 @@ class MainActivity : ComponentActivity() {
                                             badge = {
                                                 when {
                                                     item.badgeCount != null -> Badge { Text(item.badgeCount.toString()) }
-                                                    item.hasNews -> Badge()
+                                                    item.hasNews -> Badge() // dot only
                                                 }
                                             }
                                         ) {
@@ -128,6 +164,7 @@ class MainActivity : ComponentActivity() {
                                     label = { Text(item.title) }
                                 )
                             }
+
                         }
                     }
                 ) { inner ->
@@ -234,7 +271,7 @@ fun Context.showNotification(title: String, message: String) {
         .also { NotificationManagerCompat.from(this).notify(1001, it.build()) }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 @Preview(showBackground = true)
 fun PomodoroScreen(
@@ -259,245 +296,354 @@ fun PomodoroScreen(
 
     val currentTask by taskViewModel.currentTask.collectAsState()
 
+    var showMotivationDialog by remember { mutableStateOf(false) }
+    var selectedMotivation by remember { mutableStateOf<MotivationEntry?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+
     LaunchedEffect(isRunning) {
         if (isRunning) pomodoroViewModel.startTickLoop()
     }
 
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ElevatedCard(
-            elevation = CardDefaults.elevatedCardElevation(4.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            shape = MaterialTheme.shapes.small
-        ) {
-            Column(
-                modifier = Modifier
+    //  BOTTOM SHEET SCAFFOLD
+    val sheetState = rememberBottomSheetScaffoldState()
+    val maxBlur = 16.dp
+    val blurDp by animateDpAsState(
+        targetValue = if (sheetState.bottomSheetState.targetValue == SheetValue.Expanded) maxBlur else 0.dp,
+        label = "BlurAnim"
+    )
+    BottomSheetScaffold(
+        sheetShadowElevation = 24.dp,
+        modifier = Modifier
+            .fillMaxWidth(),
+        scaffoldState = sheetState,
+        sheetPeekHeight = 48.dp,
+        sheetContent = {
+            LazyColumn(
+                Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .heightIn(min = 100.dp, max = 400.dp)
+                    .padding(16.dp)
             ) {
-                if (current != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                items(100) { index ->
+                    Text("• History Entry #$index")
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                }
+
+
+            }
+        },
+        content = { innerPadding ->
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .blur(blurDp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.Top,
+                horizontalAlignment = Alignment.CenterHorizontally
+
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+                ElevatedCard(
+                    elevation = CardDefaults.elevatedCardElevation(4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Checkbox(
-                            checked = current!!.isDone,
-                            onCheckedChange = {
-                                // Pause timer if running and confirm marking done
-                                pendingDoneState = it
-                                if (isRunning) pomodoroViewModel.stopTimer()
-                                showConfirmDone = true
-                            }
-                        )
-                        Column {
-                            Text(current!!.title, style = MaterialTheme.typography.headlineSmall)
-                            if (current!!.description.isNotBlank())
-                                Text(
-                                    current!!.description,
-                                    style = MaterialTheme.typography.bodyLarge
+                        if (current != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = current!!.isDone,
+                                    onCheckedChange = {
+                                        // Pause timer if running and confirm marking done
+                                        pendingDoneState = it
+                                        if (isRunning) pomodoroViewModel.stopTimer()
+                                        showConfirmDone = true
+                                    }
                                 )
+                                Column {
+                                    Text(
+                                        current!!.title,
+                                        style = MaterialTheme.typography.headlineSmall
+                                    )
+                                    if (current!!.description.isNotBlank())
+                                        Text(
+                                            current!!.description,
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                }
+                            }
+                        } else {
+                            Text("No task selected", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                } else {
-                    Text("No task selected", style = MaterialTheme.typography.bodyMedium)
                 }
-            }
-        }
 
-        Spacer(Modifier.height(24f.dp))
+                Spacer(Modifier.height(24f.dp))
 
-        // Segmented buttons
-        SingleChoiceSegmentedButtonRow {
-            SegmentedButton(
-                shape = SegmentedButtonDefaults.itemShape(0, 2),
-                onClick = {
-                    pomodoroViewModel.setSegmentButtonSelectedIndex(0)
-                    pomodoroViewModel.resetTimer()
-                },
-                selected = pomodoroViewModel.segmentButtonSelectedIndex.value == 0,
-                icon = { Icon(Icons.Filled.HourglassBottom, contentDescription = "Work") },
-                label = { Text("Focus") }
-            )
-            SegmentedButton(
-                shape = SegmentedButtonDefaults.itemShape(1, 2),
-                onClick = {
-                    pomodoroViewModel.setSegmentButtonSelectedIndex(1)
+                // Segmented buttons
+                SingleChoiceSegmentedButtonRow {
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(0, 2),
+                        onClick = {
+                            pomodoroViewModel.setSegmentButtonSelectedIndex(0)
+                            pomodoroViewModel.resetTimer()
+                        },
+                        selected = pomodoroViewModel.segmentButtonSelectedIndex.value == 0,
+                        icon = { Icon(Icons.Filled.HourglassBottom, contentDescription = "Work") },
+                        label = { Text("Focus") }
+                    )
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(1, 2),
+                        onClick = {
+                            pomodoroViewModel.setSegmentButtonSelectedIndex(1)
 //                    pomodoroViewModel.resetTimer(false)
-                },
-                selected = pomodoroViewModel.segmentButtonSelectedIndex.value == 1,
-                icon = { Icon(Icons.Filled.Coffee, contentDescription = "Break") },
-                label = { Text("Break") }
-            )
-        }
+                        },
+                        selected = pomodoroViewModel.segmentButtonSelectedIndex.value == 1,
+                        icon = { Icon(Icons.Filled.Coffee, contentDescription = "Break") },
+                        label = { Text("Break") }
+                    )
+                }
 
-        Spacer(Modifier.height(24f.dp))
+                Spacer(Modifier.height(24f.dp))
 
-        Box(
-            modifier = Modifier.size(300.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularWavyProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier.matchParentSize()
-            )
-            Text(
-                text = formatTime(timeLeft),
-                fontSize = 96.sp
-            )
-        }
+                Box(
+                    modifier = Modifier.size(250.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularWavyProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.matchParentSize()
+                    )
+                    Text(
+                        text = formatTime(timeLeft),
+                        fontSize = 72.sp
+                    )
+                }
 
-        Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp))
 
-        // Start/Pause & Reset Buttons
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    if (isRunning) pomodoroViewModel.stopTimer()
-                    else pomodoroViewModel.runTimer {
-                        context.showNotification("Pomodoro Complete", "Time for a break!")
+                // Start/Pause & Reset Buttons
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            if (isRunning) pomodoroViewModel.stopTimer()
+                            else pomodoroViewModel.runTimer {
+                                coroutineScope.launch {
+                                    delay(800L) // add your desired delay (e.g., 0.8 seconds)
+                                    selectedMotivation = getRandomMotivation() // always pick a new one
+                                    showMotivationDialog = true
+                                }
+                                context.showNotification("Pomodoro Complete", "Time for a break!")
+                            }
+
+
+                        },
+                        enabled = timeLeft != 0L
+                    ) {
+                        Icon(
+                            imageVector = if (isRunning) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                            contentDescription = null
+                        )
+                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                        Text(if (isRunning) "Pause" else "Start")
                     }
-                },
-                enabled = timeLeft != 0L
-            ) {
-                Icon(
-                    imageVector = if (isRunning) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                    contentDescription = null
-                )
-                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text(if (isRunning) "Pause" else "Start")
-            }
 
-            val justReset by pomodoroViewModel.timerJustReset.collectAsState()
-            OutlinedButton(
-                onClick = {
-                    pomodoroViewModel.resetTimer()
-                },
-                enabled = !justReset
-            ) {
-                Icon(Icons.Outlined.RestartAlt, contentDescription = null)
-                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text("Reset")
-            }
-        }
+                    val justReset by pomodoroViewModel.timerJustReset.collectAsState()
+                    OutlinedButton(
+                        onClick = {
+                            pomodoroViewModel.resetTimer()
+                        },
+                        enabled = !justReset
+                    ) {
+                        Icon(Icons.Outlined.RestartAlt, contentDescription = null)
+                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                        Text("Reset")
+                    }
+                }
 
-        Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.height(16.dp))
 
-        Spacer(Modifier.height(16.dp))
+
+
 
 // Preset timer buttons
-        val openCustomDialog = remember { mutableStateOf(false) }
-        if (openCustomDialog.value) {
-            var minutes by remember { mutableStateOf("") }
-            var seconds by remember { mutableStateOf("") }
+                val openCustomDialog = remember { mutableStateOf(false) }
+                if (openCustomDialog.value) {
+                    var minutes by remember { mutableStateOf("") }
+                    var seconds by remember { mutableStateOf("") }
 
-            AlertDialog(
-                onDismissRequest = { openCustomDialog.value = false },
-                title = { Text("Custom Timer") },
-                text = {
-                    Column {
-                        OutlinedTextField(
-                            value = minutes,
-                            onValueChange = { minutes = it.filter { c -> c.isDigit() } },
-                            label = { Text("Minutes") },
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = seconds,
-                            onValueChange = { seconds = it.filter { c -> c.isDigit() } },
-                            label = { Text("Seconds") },
-                            singleLine = true
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val min = minutes.toLongOrNull() ?: 0L
-                        val sec = seconds.toLongOrNull() ?: 0L
-                        val totalMs = (min * 60 + sec) * 1000
-                        pomodoroViewModel.setCustomTime(totalMs)
-                        openCustomDialog.value = false
-                    }) {
-                        Text("Set")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { openCustomDialog.value = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
-
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val isWorkMode = pomodoroViewModel.segmentButtonSelectedIndex.value == 0
-
-            val presets = if (isWorkMode)
-                listOf(25 * 60 * 1000L to "25 min", 10 * 60 * 1000L to "10 min")
-            else
-                listOf(5 * 60 * 1000L to "5 min", 3 * 60 * 1000L to "3 min")
-
-            presets.forEach { (duration, label) ->
-                OutlinedButton(
-                    onClick = { pomodoroViewModel.setCustomTime(duration) },
-                    enabled = !isRunning
-                ) {
-                    Text(label)
-                }
-            }
-
-            OutlinedButton(
-                onClick = { openCustomDialog.value = true },
-                enabled = !isRunning
-            ) {
-                Text("Custom")
-            }
-        }
-
-
-        // Confirmation dialog
-        if (showConfirmDone && current != null) {
-            AlertDialog(
-                onDismissRequest = { showConfirmDone = false },
-                title = { Text("Mark task ${if (pendingDoneState) "done" else "undone"}?") },
-                text = {
-                    Text(
-                        if (pendingDoneState)
-                            "This will stop your Pomodoro and mark “${current!!.title}” as completed."
-                        else
-                            "This will un‐mark “${current!!.title}” as completed."
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        // commit the toggle
-                        taskViewModel.toggleTaskDone(current!!.id)
-                        showConfirmDone = false
-                    }) { Text("Yes") }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        // if they cancel, we need to resume timer if it was running
-                        showConfirmDone = false
-                        if (timeLeft > 0L) {
-                            // they had been running, so restart
-                            pomodoroViewModel.runTimer { /* same notification */ }
+                    AlertDialog(
+                        onDismissRequest = { openCustomDialog.value = false },
+                        title = { Text("Custom Timer") },
+                        text = {
+                            Column {
+                                OutlinedTextField(
+                                    value = minutes,
+                                    onValueChange = { minutes = it.filter { c -> c.isDigit() } },
+                                    label = { Text("Minutes") },
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = seconds,
+                                    onValueChange = { seconds = it.filter { c -> c.isDigit() } },
+                                    label = { Text("Seconds") },
+                                    singleLine = true
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val min = minutes.toLongOrNull() ?: 0L
+                                val sec = seconds.toLongOrNull() ?: 0L
+                                val totalMs = (min * 60 + sec) * 1000
+                                pomodoroViewModel.setCustomTime(totalMs)
+                                openCustomDialog.value = false
+                            }) {
+                                Text("Set")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { openCustomDialog.value = false }) {
+                                Text("Cancel")
+                            }
                         }
-                    }) { Text("No") }
+                    )
                 }
-            )
-        }
-    }
+
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val isWorkMode = pomodoroViewModel.segmentButtonSelectedIndex.value == 0
+
+                    val presets = if (isWorkMode)
+                        listOf(25 * 60 * 1000L to "25 min", 10 * 60 * 1000L to "10 min")
+                    else
+                        listOf(5 * 60 * 1000L to "5 min", 3 * 60 * 1000L to "3 min")
+
+                    presets.forEach { (duration, label) ->
+                        OutlinedButton(
+                            onClick = { pomodoroViewModel.setCustomTime(duration) },
+                            enabled = !isRunning
+                        ) {
+                            Text(label)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { openCustomDialog.value = true },
+                        enabled = !isRunning
+                    ) {
+                        Text("Custom")
+                    }
+                }
+
+
+                // Confirmation dialog
+                if (showConfirmDone && current != null) {
+                    AlertDialog(
+                        onDismissRequest = { showConfirmDone = false },
+                        title = { Text("Mark task ${if (pendingDoneState) "done" else "undone"}?") },
+                        text = {
+                            Text(
+                                if (pendingDoneState)
+                                    "This will stop your Pomodoro and mark “${current!!.title}” as completed."
+                                else
+                                    "This will un‐mark “${current!!.title}” as completed."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                // commit the toggle
+                                taskViewModel.toggleTaskDone(current!!.id)
+                                showConfirmDone = false
+                            }) { Text("Yes") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                showConfirmDone = false
+                            }) { Text("No") }
+                        }
+                    )
+                }
+            }
+
+            if (showMotivationDialog && selectedMotivation != null) {
+                AlertDialog(
+                    onDismissRequest = { showMotivationDialog = false },
+                    confirmButton = {
+                        TextButton(onClick = { showMotivationDialog = false }) {
+                            Text("Thanks!")
+                        }
+                    },
+                    title = { Text("Session Complete") },
+                    text = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (showMotivationDialog && selectedMotivation != null) {
+                                val context = LocalContext.current
+                                val imageLoader = remember {
+                                    ImageLoader.Builder(context)
+                                        .components { add(GifDecoder.Factory()) }
+                                        .build()
+                                }
+
+                                AlertDialog(
+                                    onDismissRequest = { showMotivationDialog = false },
+                                    confirmButton = {
+                                        TextButton(onClick = { showMotivationDialog = false }) {
+                                            Text("Thanks!")
+                                        }
+                                    },
+                                    title = { Text("Session Complete") },
+                                    text = {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(context)
+                                                    .data(selectedMotivation!!.imageResId)
+                                                    .build(),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(200.dp),
+                                                imageLoader = imageLoader
+                                            )
+
+                                            Spacer(Modifier.height(12.dp))
+                                            Text(selectedMotivation!!.message)
+                                        }
+                                    }
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text(selectedMotivation!!.message)
+                        }
+                    }
+                )
+            }
+
+        })
+
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TestBottomSheetLayout() {
+
+}
+
 
 data class Task(
     val id: Int,
@@ -558,6 +704,15 @@ fun TaskScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item {
+                    StreakCard(
+                        quote = "Discipline is the bridge between goals and accomplishment.",
+                        currentStreak = 3,
+                        tasksDoneToday = 5,
+                        longestStreak = 7
+                    )
+                }
+
                 items(tasks.reversed(), key = { it.id }) { task ->
                     ListItem(
                         headlineContent = { Text(task.title) },
@@ -662,6 +817,60 @@ fun TaskScreen(
         }
     }
 }
+
+@Composable
+fun StreakCard(
+    quote: String,
+    currentStreak: Int,
+    tasksDoneToday: Int,
+    longestStreak: Int,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+
+            // ✨ Weekly quote
+            Text(
+                text = "\"$quote\"",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp, top = 12.dp))
+            Row{
+                Icon(
+                    Icons.Default.LocalFireDepartment,
+                    contentDescription = "Streak Icon",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Pomodoro Streak", style = MaterialTheme.typography.titleMedium)
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$currentStreak", style = MaterialTheme.typography.headlineSmall)
+                    Text("Current", style = MaterialTheme.typography.bodySmall)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$tasksDoneToday", style = MaterialTheme.typography.headlineSmall)
+                    Text("Today", style = MaterialTheme.typography.bodySmall)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$longestStreak", style = MaterialTheme.typography.headlineSmall)
+                    Text("Longest", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
 
 
 @Composable

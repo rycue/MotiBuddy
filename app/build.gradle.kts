@@ -50,6 +50,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.7")
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("io.coil-kt.coil3:coil-compose:3.2.0")
+    implementation("io.coil-kt:coil-gif:2.4.0")
     implementation("androidx.compose.material3:material3:1.2.1")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.core:core-ktx:1.12.0")

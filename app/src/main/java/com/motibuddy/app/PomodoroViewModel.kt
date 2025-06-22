@@ -1,7 +1,5 @@
 package com.motibuddy.app
 
-import android.util.MutableInt
-import androidx.compose.runtime.MutableIntState
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -22,11 +20,9 @@ class PomodoroViewModel : ViewModel() {
     private var focusModeDuration = timeWork
     private var breakModeDuration = timeBreak
 
-
     private var currentModeInitialDuration = timeWork // default fallback
     private val _currentTotalDuration = MutableStateFlow(timeWork)
     val currentTotalDuration = _currentTotalDuration.asStateFlow()
-
 
     private val _timerJustReset = MutableStateFlow(true)
     val timerJustReset = _timerJustReset.asStateFlow()
@@ -38,6 +34,12 @@ class PomodoroViewModel : ViewModel() {
     val isRunning = _isRunning.asStateFlow()
 
     private var timerJob: Job? = null
+
+    private val _sessionHistory = MutableStateFlow<List<PomodoroSession>>(emptyList())
+    val sessionHistory = _sessionHistory.asStateFlow()
+
+
+    var currentTaskTitle: String? = null
 
     /** Starts or resumes the timer. */
     fun runTimer(onFinish: () -> Unit) {
@@ -51,6 +53,7 @@ class PomodoroViewModel : ViewModel() {
             }
             if (_timeLeft.value == 0L) {
                 _isRunning.value = false
+                logSession()
                 onFinish()
             }
         }
@@ -84,8 +87,6 @@ class PomodoroViewModel : ViewModel() {
         _timerJustReset.value = true
     }
 
-
-
     fun startTickLoop() {
         runTimer(onFinish = {}) // no-op if already finished
     }
@@ -102,7 +103,26 @@ class PomodoroViewModel : ViewModel() {
         _timerJustReset.value = true
     }
 
+    private fun logSession() {
+        val task = currentTaskTitle ?: return
+        val isFocus = _segmentButtonSelectedIndex.value == 0
+        val duration = if (isFocus) timeWork else timeBreak
 
-
+        val session = PomodoroSession(
+            taskTitle = task,
+            durationMillis = duration,
+            isFocus = isFocus,
+            timestamp = System.currentTimeMillis()
+        )
+        _sessionHistory.value = listOf(session) + _sessionHistory.value // prepend
+    }
 
 }
+
+// Session log entry
+data class PomodoroSession(
+    val taskTitle: String,
+    val durationMillis: Long,
+    val isFocus: Boolean,
+    val timestamp: Long
+)
