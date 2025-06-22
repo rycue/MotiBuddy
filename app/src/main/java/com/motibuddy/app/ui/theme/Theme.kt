@@ -25,11 +25,14 @@ fun MotiBuddyTheme(
     val primaryColor by ThemeColorManager.primaryColor.collectAsState()
 
     val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            dynamicLightColorScheme(context).copy(primary = primaryColor)
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (darkTheme) dynamicDarkColorScheme(context).copy(primary = primaryColor)
+            else dynamicLightColorScheme(context).copy(primary = primaryColor)
+        }
         darkTheme -> darkColorScheme(primary = primaryColor)
         else -> lightColorScheme(primary = primaryColor)
     }
+
 
     MaterialTheme(
         colorScheme = colorScheme,

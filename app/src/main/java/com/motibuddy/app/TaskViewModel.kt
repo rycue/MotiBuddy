@@ -19,6 +19,43 @@ class TaskViewModel: ViewModel() {
     private val _taskList = MutableStateFlow<List<Task>>(emptyList())
     val taskList: StateFlow<List<Task>> = _taskList
 
+    // DEMO DATA
+    init {
+        _taskList.value = listOf(
+            Task(
+                id = 1,
+                title = "Morning Study Session",
+                description = "Review notes or study a topic for at least 25 minutes.",
+                isDone = false
+            ),
+            Task(
+                id = 2,
+                title = "Work on Personal Project",
+                description = "Code or design something for your portfolio or side project.",
+                isDone = false
+            ),
+            Task(
+                id = 3,
+                title = "Read a Book",
+                description = "Read a chapter or section using focused 25-minute Pomodoro.",
+                isDone = false
+            ),
+            Task(
+                id = 4,
+                title = "Exercise Routine",
+                description = "Follow a structured workout or yoga with breaks.",
+                isDone = false
+            ),
+            Task(
+                id = 5,
+                title = "Evening Digital Cleanup",
+                description = "Sort files, plan next day, check tasks for tomorrow.",
+                isDone = false
+            )
+        )
+    }
+
+
     // Currently selected (focused) task
     private val _currentTask = MutableStateFlow<Task?>(null)
     val currentTask: StateFlow<Task?> = _currentTask
