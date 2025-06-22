@@ -1,3 +1,4 @@
+//MainActivity.kt
 package com.motibuddy.app
 
 import android.net.Uri
@@ -90,7 +91,6 @@ fun getRandomMotivation(): MotivationEntry {
     return motivationList.random()
 }
 
-
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -164,7 +164,6 @@ class MainActivity : ComponentActivity() {
                                     label = { Text(item.title) }
                                 )
                             }
-
                         }
                     }
                 ) { inner ->
@@ -173,21 +172,17 @@ class MainActivity : ComponentActivity() {
                             0 -> TaskScreen(
                                 taskViewModel = taskVM,
                                 onTaskClick = { id ->
-                                    // only allow if not already done
                                     taskVM.taskList.value.find { it.id == id }?.let { task ->
-                                        taskVM.taskList.value.find { it.id == id }?.let { task ->
-                                            if (!task.isDone) {
-                                                taskVM.setCurrentTask(id)
-                                                selectedIndex = 1
-                                                isCreatingNewTask = false
-                                            } else {
-                                                Toast.makeText(
-                                                    ctx,
-                                                    "That task is already completed",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-
-                                            }
+                                        if (!task.isDone) {
+                                            taskVM.setCurrentTask(id)
+                                            selectedIndex = 1
+                                            isCreatingNewTask = false
+                                        } else {
+                                            Toast.makeText(
+                                                ctx,
+                                                "That task is already completed",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
                                     }
                                 },
@@ -198,8 +193,6 @@ class MainActivity : ComponentActivity() {
                                     isCreatingNewTask = false
                                 },
                                 isCreatingNewTask = isCreatingNewTask,
-
-                                // 👇 these are new
                                 onCreateNewTask = {
                                     isCreatingNewTask = true
                                     editingTaskId = null
@@ -223,18 +216,15 @@ class MainActivity : ComponentActivity() {
                                     editingTaskId = null
                                 }
                             )
-
                             1 -> PomodoroScreen(
                                 pomodoroViewModel = pomoVM,
                                 taskViewModel = taskVM
                             )
-
                             2 -> BotScreen()
-                            3 -> ThemeSettingsScreen { recreate() } // This will trigger activity recreation for new theme
+                            3 -> ThemeSettingsScreen { recreate() }
                         }
                     }
                 }
-
             }
         }
     }
@@ -262,12 +252,20 @@ data class BottomNavigationItem(
 
 @Suppress("MissingPermission")
 fun Context.showNotification(title: String, message: String) {
+    val prefs = BotPrefs(this)
+    val soundUri = prefs.soundUri?.let { Uri.parse(it) }
+
     NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
         .setContentTitle(title)
         .setContentText(message)
         .setAutoCancel(true)
         .setDefaults(NotificationCompat.DEFAULT_ALL)
+        .apply {
+            if (soundUri != null) {
+                setSound(soundUri)
+            }
+        }
         .also { NotificationManagerCompat.from(this).notify(1001, it.build()) }
 }
 
@@ -285,27 +283,30 @@ fun PomodoroScreen(
     val context = LocalContext.current
     val timeLeft by pomodoroViewModel.timeLeft.collectAsState()
     val isRunning by pomodoroViewModel.isRunning.collectAsState()
-//    var segmentButtonSelectedIndex by remember { mutableIntStateOf(pomodoroViewModel.segmentButtonSelectedIndex.value) }
-    val progress =
-        if (pomodoroViewModel.segmentButtonSelectedIndex.value == 0) timeLeft.toFloat() / pomodoroViewModel.timeWork else timeLeft.toFloat() / pomodoroViewModel.timeBreak
+    val progress = if (pomodoroViewModel.segmentButtonSelectedIndex.value == 0) {
+        timeLeft.toFloat() / pomodoroViewModel.timeWork
+    } else {
+        timeLeft.toFloat() / pomodoroViewModel.timeBreak
+    }
     val totalDuration by pomodoroViewModel.currentTotalDuration.collectAsState()
     val animatedProgress by animateFloatAsState(
         targetValue = timeLeft.toFloat() / totalDuration.toFloat(),
         animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec
     )
 
-    val currentTask by taskViewModel.currentTask.collectAsState()
+    // Initialize BotPrefs to access the custom motivational message
+    val prefs = remember { BotPrefs(context) }
+    val customMessage by remember { mutableStateOf(prefs.message) }
 
     var showMotivationDialog by remember { mutableStateOf(false) }
     var selectedMotivation by remember { mutableStateOf<MotivationEntry?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
-
     LaunchedEffect(isRunning) {
         if (isRunning) pomodoroViewModel.startTickLoop()
     }
 
-    //  BOTTOM SHEET SCAFFOLD
+    // BOTTOM SHEET SCAFFOLD
     val sheetState = rememberBottomSheetScaffoldState()
     val maxBlur = 16.dp
     val blurDp by animateDpAsState(
@@ -314,8 +315,7 @@ fun PomodoroScreen(
     )
     BottomSheetScaffold(
         sheetShadowElevation = 24.dp,
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         scaffoldState = sheetState,
         sheetPeekHeight = 48.dp,
         sheetContent = {
@@ -329,8 +329,6 @@ fun PomodoroScreen(
                     Text("• History Entry #$index")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 }
-
-
             }
         },
         content = { innerPadding ->
@@ -342,7 +340,6 @@ fun PomodoroScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
-
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 ElevatedCard(
@@ -367,7 +364,6 @@ fun PomodoroScreen(
                                 Checkbox(
                                     checked = current!!.isDone,
                                     onCheckedChange = {
-                                        // Pause timer if running and confirm marking done
                                         pendingDoneState = it
                                         if (isRunning) pomodoroViewModel.stopTimer()
                                         showConfirmDone = true
@@ -409,7 +405,6 @@ fun PomodoroScreen(
                         shape = SegmentedButtonDefaults.itemShape(1, 2),
                         onClick = {
                             pomodoroViewModel.setSegmentButtonSelectedIndex(1)
-//                    pomodoroViewModel.resetTimer(false)
                         },
                         selected = pomodoroViewModel.segmentButtonSelectedIndex.value == 1,
                         icon = { Icon(Icons.Filled.Coffee, contentDescription = "Break") },
@@ -442,14 +437,16 @@ fun PomodoroScreen(
                             if (isRunning) pomodoroViewModel.stopTimer()
                             else pomodoroViewModel.runTimer {
                                 coroutineScope.launch {
-                                    delay(800L) // add your desired delay (e.g., 0.8 seconds)
-                                    selectedMotivation = getRandomMotivation() // always pick a new one
+                                    delay(800L)
+                                    selectedMotivation = getRandomMotivation()
                                     showMotivationDialog = true
                                 }
-                                context.showNotification("Pomodoro Complete", "Time for a break!")
+                                // Use custom message from BotPrefs, fallback to selectedMotivation or default
+                                val notificationMessage = customMessage.takeIf { it.isNotBlank() }
+                                    ?: selectedMotivation?.message
+                                    ?: "Time for a break!"
+                                context.showNotification("Pomodoro Complete", notificationMessage)
                             }
-
-
                         },
                         enabled = timeLeft != 0L
                     ) {
@@ -463,9 +460,7 @@ fun PomodoroScreen(
 
                     val justReset by pomodoroViewModel.timerJustReset.collectAsState()
                     OutlinedButton(
-                        onClick = {
-                            pomodoroViewModel.resetTimer()
-                        },
+                        onClick = { pomodoroViewModel.resetTimer() },
                         enabled = !justReset
                     ) {
                         Icon(Icons.Outlined.RestartAlt, contentDescription = null)
@@ -476,10 +471,7 @@ fun PomodoroScreen(
 
                 Spacer(Modifier.height(16.dp))
 
-
-
-
-// Preset timer buttons
+                // Preset timer buttons
                 val openCustomDialog = remember { mutableStateOf(false) }
                 if (openCustomDialog.value) {
                     var minutes by remember { mutableStateOf("") }
@@ -551,7 +543,6 @@ fun PomodoroScreen(
                     }
                 }
 
-
                 // Confirmation dialog
                 if (showConfirmDone && current != null) {
                     AlertDialog(
@@ -567,83 +558,58 @@ fun PomodoroScreen(
                         },
                         confirmButton = {
                             TextButton(onClick = {
-                                // commit the toggle
                                 taskViewModel.toggleTaskDone(current!!.id)
                                 showConfirmDone = false
                             }) { Text("Yes") }
                         },
                         dismissButton = {
-                            TextButton(onClick = {
-                                showConfirmDone = false
-                            }) { Text("No") }
+                            TextButton(onClick = { showConfirmDone = false }) { Text("No") }
                         }
                     )
                 }
-            }
 
-            if (showMotivationDialog && selectedMotivation != null) {
-                AlertDialog(
-                    onDismissRequest = { showMotivationDialog = false },
-                    confirmButton = {
-                        TextButton(onClick = { showMotivationDialog = false }) {
-                            Text("Thanks!")
-                        }
-                    },
-                    title = { Text("Session Complete") },
-                    text = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (showMotivationDialog && selectedMotivation != null) {
+                if (showMotivationDialog && selectedMotivation != null) {
+                    AlertDialog(
+                        onDismissRequest = { showMotivationDialog = false },
+                        confirmButton = {
+                            TextButton(onClick = { showMotivationDialog = false }) {
+                                Text("Thanks!")
+                            }
+                        },
+                        title = { Text("Session Complete") },
+                        text = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 val context = LocalContext.current
                                 val imageLoader = remember {
                                     ImageLoader.Builder(context)
                                         .components { add(GifDecoder.Factory()) }
                                         .build()
                                 }
-
-                                AlertDialog(
-                                    onDismissRequest = { showMotivationDialog = false },
-                                    confirmButton = {
-                                        TextButton(onClick = { showMotivationDialog = false }) {
-                                            Text("Thanks!")
-                                        }
-                                    },
-                                    title = { Text("Session Complete") },
-                                    text = {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            AsyncImage(
-                                                model = ImageRequest.Builder(context)
-                                                    .data(selectedMotivation!!.imageResId)
-                                                    .build(),
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(200.dp),
-                                                imageLoader = imageLoader
-                                            )
-
-                                            Spacer(Modifier.height(12.dp))
-                                            Text(selectedMotivation!!.message)
-                                        }
-                                    }
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(selectedMotivation!!.imageResId)
+                                        .build(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp),
+                                    imageLoader = imageLoader
                                 )
+                                Spacer(Modifier.height(12.dp))
+                                Text(selectedMotivation!!.message)
                             }
-                            Spacer(Modifier.height(12.dp))
-                            Text(selectedMotivation!!.message)
                         }
-                    }
-                )
+                    )
+                }
             }
-
-        })
-
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TestBottomSheetLayout() {
-
 }
-
 
 data class Task(
     val id: Int,
@@ -652,7 +618,6 @@ data class Task(
     val isDone: Boolean = false,
     val isTemp: Boolean = false
 )
-
 
 @OptIn(
     ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
@@ -833,15 +798,13 @@ fun StreakCard(
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
-
-            // ✨ Weekly quote
             Text(
                 text = "\"$quote\"",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
             HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp, top = 12.dp))
-            Row{
+            Row {
                 Icon(
                     Icons.Default.LocalFireDepartment,
                     contentDescription = "Streak Icon",
@@ -871,8 +834,6 @@ fun StreakCard(
     }
 }
 
-
-
 @Composable
 fun HomeScreen() {
     Text("Home")
@@ -888,8 +849,9 @@ fun BotScreen() {
     var message by remember { mutableStateOf(prefs.message) }
     var imageUri by remember { mutableStateOf<Uri?>(prefs.imageUri?.let { Uri.parse(it) }) }
     var colorHex by remember { mutableStateOf(prefs.themeColor) }
+    var soundUri by remember { mutableStateOf<Uri?>(prefs.soundUri?.let { Uri.parse(it) }) }
 
-    val launcher = rememberLauncherForActivityResult(
+    val imageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
@@ -902,9 +864,30 @@ fun BotScreen() {
         }
     }
 
-    LaunchedEffect(username, message) {
+    val soundLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            // Validate MIME type
+            val mimeType = contentResolver.getType(uri)
+            if (mimeType == "audio/mpeg") {
+                contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                soundUri = it
+                prefs.soundUri = it.toString()
+                Toast.makeText(context, "Notification sound updated", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Please select an MP3 file", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    LaunchedEffect(username, message, soundUri) {
         prefs.username = username
         prefs.message = message
+        prefs.soundUri = soundUri?.toString()
     }
 
     Column(
@@ -926,7 +909,7 @@ fun BotScreen() {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUri)
-                        .size(100) // resize to 100x100
+                        .size(100)
                         .crossfade(true)
                         .build(),
                     contentDescription = "Bot Profile",
@@ -942,7 +925,7 @@ fun BotScreen() {
                 )
             }
 
-            IconButton(onClick = { launcher.launch("image/*") }) {
+            IconButton(onClick = { imageLauncher.launch("image/*") }) {
                 Icon(Icons.Default.Edit, contentDescription = "Edit Image")
             }
         }
@@ -978,27 +961,36 @@ fun BotScreen() {
             placeholder = { Text("#6750A4") }
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
 
         val scope = rememberCoroutineScope()
 
         Button(onClick = {
             try {
                 val parsedColor = Color(android.graphics.Color.parseColor(colorHex))
-                prefs.themeColor = colorHex // Optional if you still want to persist
+                prefs.themeColor = colorHex
                 ThemeColorManager.setCustomPrimary(
                     context,
                     parsedColor
-                ) // 🔁 This triggers immediate update
+                )
             } catch (e: Exception) {
                 Toast.makeText(context, "Invalid hex code", Toast.LENGTH_SHORT).show()
             }
         }) {
             Text("Apply Color")
         }
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedButton(
+            onClick = { soundLauncher.launch("audio/mpeg") }
+        ) {
+            Icon(Icons.Default.MusicNote, contentDescription = null)
+            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+            Text(if (soundUri != null) "Change Notification Sound" else "Upload Notification Sound")
+        }
     }
 }
-
 
 @Composable
 fun CustomTheme(content: @Composable () -> Unit) {

@@ -1,3 +1,4 @@
+//BotPrefs.kt
 package com.motibuddy.app
 
 import android.content.Context
@@ -22,4 +23,8 @@ class BotPrefs(context: Context) {
     var themeColor: String
         get() = prefs.getString("theme_color", "#6750A4") ?: "#6750A4"
         set(value) = prefs.edit().putString("theme_color", value).apply()
+
+    var soundUri: String?
+        get() = prefs.getString("soundUri", null)
+        set(value) = prefs.edit().putString("soundUri", value).apply()
 }
